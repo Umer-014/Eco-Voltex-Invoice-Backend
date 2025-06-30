@@ -21,8 +21,8 @@ exports.createInvoice = async (req, res) => {
 
     console.log("Data received from frontend:", req.body);
 
-    if (!clientName || !clientPhone || !clientAddress || !postCode || !category || !paymentOption || !paidAmount || services.length === 0 || !date) {
-      return res.status(400).json({ message: 'All fields are required, including date' });
+    if (!clientName || !clientAddress || !postCode || !category || !paymentOption || !paidAmount || services.length === 0 || !date) {
+      return res.status(400).json({ message: 'All fields are required, including date (clientPhone is optional)' });
     }
 
     // Calculate total price
@@ -66,9 +66,9 @@ exports.createInvoice = async (req, res) => {
     const invoiceNumber = `INV-${monthYear}-${weekNumber}${paddedSequence}`;
 
     // Create a new invoice
-    const newInvoice = new Invoice({
+    // Build invoice data, only include clientPhone if provided
+    const invoiceData = {
       clientName,
-      clientPhone,
       clientAddress,
       postCode,
       paymentOption,
@@ -81,7 +81,12 @@ exports.createInvoice = async (req, res) => {
       remainingAmount: finalRemainingAmount,
       invoiceNumber,
       createdAt: providedDate.toDate() // Use provided date instead of system date
-    });
+    };
+    if (clientPhone) {
+      invoiceData.clientPhone = clientPhone;
+    }
+
+    const newInvoice = new Invoice(invoiceData);
 
     // Save to database
     await newInvoice.save();

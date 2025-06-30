@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const invoiceSchema = new mongoose.Schema({
   clientName: { type: String, required: true },
-  clientPhone: { type: String, required: true },
-  clientAddress: { type: String, required: true },
+  clientPhone: { type: String },
+  clientAddress: { type: String, required: false },
   postCode: { type: String, required: true },
   paymentOption: { type: String, required: true },
   category: { type: String, required: true },
