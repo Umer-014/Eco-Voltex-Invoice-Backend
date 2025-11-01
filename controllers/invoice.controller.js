@@ -46,7 +46,8 @@ exports.createInvoice = async (req, res) => {
     const numericPaidAmount = Number(paidAmount || 0);
 
     // Calculate total, discount & remaining
-    const totalPrice = numericServices.reduce((sum, s) => sum + s.price * s.quantity, 0);
+    const totalPrice = numericServices.reduce((sum, s) => sum + s.price * s.quantity, 0).toFixed(2);
+
     const discountedPrice = totalPrice - (totalPrice * numericDiscount) / 100;
     const finalRemainingAmount = Math.max(discountedPrice - numericPaidAmount, 0);
 
