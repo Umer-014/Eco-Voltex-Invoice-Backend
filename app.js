@@ -66,6 +66,9 @@ app.use((err, _req, res, _next) => {
 const adminRoutes = require('./routes/admin');
 app.use('/api/admin', adminRoutes);
 
+const quoteRoutes = require('./routes/quote.routes');
+app.use('/api/quotes', quoteRoutes);
+
 
 /* ---------------- Start server ---------------- */
 const PORT = process.env.PORT || 4000;
