@@ -3,6 +3,7 @@ const Invoice = require('../models/invoice.model');
 const moment = require('moment'); // for date formatting
 
 // Create a new invoice
+// Create a new invoice (uses flat £ discount)
 exports.createInvoice = async (req, res) => {
   try {
     const {
@@ -13,9 +14,9 @@ exports.createInvoice = async (req, res) => {
       paymentOption,
       category,
       services,
-      discount,
+      discount,      // now flat £ amount
       paidAmount,
-      date // Accept date from frontend
+      date           // Accept date from frontend
     } = req.body;
 
     console.log('Data received from frontend:', req.body);
@@ -37,35 +38,45 @@ exports.createInvoice = async (req, res) => {
     }
 
     // Cast numbers safely
-    const numericServices = (services || []).map(s => ({
+    const numericServices = (services || []).map((s) => ({
       name: s.name,
       price: Number(s.price || 0),
-      quantity: Number(s.quantity || 1)
+      quantity: Number.isFinite(Number(s.quantity)) ? Number(s.quantity) : 1,
     }));
-    const numericDiscount = Number(discount || 0);
-    const numericPaidAmount = Number(paidAmount || 0);
 
-    // Calculate total, discount & remaining
-    const totalPrice = numericServices.reduce((sum, s) => sum + s.price * s.quantity, 0).toFixed(2);
+    const numericPaidAmount = Math.max(0, Number(paidAmount || 0));
 
-    const discountedPrice = totalPrice - (totalPrice * numericDiscount) / 100;
-    const finalRemainingAmount = Math.max(discountedPrice - numericPaidAmount, 0);
+    // ---- Flat £ discount (not percent)
+    let numericDiscount = Math.max(0, Number(discount || 0)); // flat £, cannot be negative
+
+    // Subtotal from services
+    const subtotal = numericServices.reduce(
+      (sum, s) => sum + (Number(s.price) || 0) * (Number(s.quantity) || 0),
+      0
+    );
+
+    // Cap the discount at subtotal
+    if (numericDiscount > subtotal) numericDiscount = subtotal;
+
+    // Totals
+    const totalPrice = +(subtotal - numericDiscount);                  // number
+    const finalRemainingAmount = Math.max(totalPrice - numericPaidAmount, 0); // number
 
     // Convert provided date to moment format
     const providedDate = moment(date, 'YYYY-MM-DD');
     const monthYear = providedDate.format('MMYY'); // e.g., 0325 for March 2025
-    const weekNumber = Math.ceil(providedDate.date() / 7); // Determine the week of the month (1-4)
+    const weekNumber = Math.ceil(providedDate.date() / 7); // Determine the week of the month (1-5)
 
     // Find the last invoice for the same month and week
     const lastInvoice = await Invoice.findOne({
-      invoiceNumber: new RegExp(`^INV-${monthYear}-${weekNumber}\\d{2}$`)
+      invoiceNumber: new RegExp(`^INV-${monthYear}-${weekNumber}\\d{2}$`),
     }).sort({ invoiceNumber: -1 });
 
     // Determine the next sequence number
     let sequenceNumber = 1;
     if (lastInvoice) {
       const parts = lastInvoice.invoiceNumber.split('-'); // ["INV", "0325", "1XX"]
-      const lastSeq = parseInt(parts[2].slice(1), 10); // Extract last 2-digit sequence
+      const lastSeq = parseInt(parts[2].slice(1), 10);    // Extract last 2-digit sequence
       sequenceNumber = isNaN(lastSeq) ? 1 : lastSeq + 1;
     }
 
@@ -90,13 +101,17 @@ exports.createInvoice = async (req, res) => {
       paymentOption,
       category,
       services: numericServices,
+      discount: numericDiscount,         // <-- flat £ discount stored
       paidAmount: numericPaidAmount,
-      discount: numericDiscount,
       numberOfServices: numericServices.length,
-      totalPrice: discountedPrice,
+
+      // store numeric totals
+      subtotal,                          // before discount
+      totalPrice,                        // after discount
       remainingAmount: finalRemainingAmount,
+
       invoiceNumber,
-      createdAt: providedDate.toDate() // Use provided date instead of system date
+      createdAt: providedDate.toDate(),  // Use provided date instead of system date
     };
     if (clientPhone) {
       invoiceData.clientPhone = clientPhone;
@@ -112,6 +127,7 @@ exports.createInvoice = async (req, res) => {
     res.status(500).json({ message: 'Internal Server Error', error: error.message });
   }
 };
+
 
 // Get all invoices
 exports.getInvoices = async (req, res) => {
